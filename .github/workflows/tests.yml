@@ -21,3 +21,4 @@ jobs:
       - run: python -m compileall -q .
 
       - run: python test_source_offer.py
+      - run: python test_preview.py

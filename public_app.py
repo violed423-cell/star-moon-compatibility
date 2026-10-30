@@ -9,6 +9,8 @@ from io import BytesIO
 import json
 import os
 import re
+import threading
+import time
 from urllib.parse import parse_qs
 from wsgiref.simple_server import make_server
 
@@ -20,9 +22,29 @@ MAX_BODY = 64 * 1024
 
 PREMIUM_BODY = '''<section class="hero"><h1>あの人との恋愛相性・関係性診断</h1><p>詳細レポートは準備中です。購入・決済はできません。</p></section><section class="panel"><h2>予定している内容</h2><p>8～12ページ程度で、2人の基本性格、恋愛傾向、相性の強み、すれ違いやすいポイント、関係を深めるヒントをお届けする予定です。</p><h2>価格案</h2><p>暫定 1,480円。販売開始前に内容・販売条件を確定します。</p><p class="warning">独自のエンターテインメント・自己理解用の参考情報であり、相手の気持ちや将来を断定するものではありません。</p><a href="/">無料診断に戻る</a></section>'''
 
-TERMS_BODY = '''<section class="hero"><div class="eyebrow">DRAFT</div><h1>利用規約</h1><p>公開前に運営者情報・実際の提供内容に合わせて確認してください。</p></section><section class="panel"><h2>サービスの性質</h2><p>本サービスは独自ルールによるエンターテインメントおよび自己理解のための参考情報です。医療、心理診断、法律、金融その他の専門的助言ではなく、科学的に検証された予測でもありません。</p><h2>結果の利用</h2><p>診断結果は恋愛・交際・結婚の成否や将来を保証しません。結果だけで重要な決定を行わず、当事者同士の対話を大切にしてください。</p><h2>禁止事項</h2><p>法令違反、サービス運営の妨害、不正アクセス、他者の権利侵害、本人の同意を欠く個人情報の不適切な利用を禁止します。</p><h2>運営者・連絡先</h2><p>運営者：［正式な氏名または法人名］<br>連絡先：［問い合わせ先］<br>施行日：［公開日］</p></section>'''
-PRIVACY_BODY = '''<section class="hero"><div class="eyebrow">DRAFT</div><h1>プライバシーポリシー</h1><p>実際のホスティング・アクセスログ・決済等の運用に合わせて公開前に更新してください。</p></section><section class="panel"><h2>取得情報・利用目的</h2><p>診断では生年月日、任意の出生時刻、恋愛スタイルの回答を受け取り、その場で結果を算出します。この試作品はアカウントや診断履歴を保存するデータベースを使用しません。</p><h2>サーバー・アクセスログ</h2><p>ホスティング事業者がIPアドレス、アクセス時刻、技術ログ等を取得する場合があります。公開前にログ仕様・保存期間を確認し、実態に合わせて修正してください。</p><h2>外部サービス</h2><p>現行版に分析タグ、広告タグ、決済連携は組み込んでいません。将来導入する場合は、送信情報・目的・提供事業者を確認して更新します。</p><h2>運営者・問い合わせ</h2><p>運営者：［正式な氏名または法人名］<br>連絡先：［問い合わせ先］<br>施行日：［公開日］</p></section>'''
-COMMERCIAL_BODY = '''<section class="hero"><div class="eyebrow">DRAFT — PAID SALES NOT ENABLED</div><h1>特定商取引法に基づく表記</h1><p>現在は決済を受け付けていません。このページは記入用テンプレートです。空欄を残したまま有料販売を開始しないでください。</p></section><section class="panel"><p><b>販売事業者名：</b>［正式な氏名または法人名］</p><p><b>運営責任者：</b>［氏名］</p><p><b>所在地：</b>［必要な情報を記入］</p><p><b>電話番号：</b>［必要な情報を記入］</p><p><b>問い合わせ先：</b>［メールアドレス等］</p><p><b>販売価格：</b>［税込価格］</p><p><b>商品代金以外の必要料金：</b>［該当する場合］</p><p><b>支払方法・時期：</b>［決済手段・支払時期］</p><p><b>提供時期：</b>［購入後いつ提供するか］</p><p><b>キャンセル・返金条件：</b>［具体的な条件］</p><p><b>動作環境：</b>［対応端末・ブラウザ］</p><p class="warning">表示項目と例外の適用は、販売形態と現行法令を確認してください。</p></section>'''
+TERMS_BODY = '''<section class="hero"><h1>利用規約</h1><p>星と月は無料の試験公開サービスです。</p></section><section class="panel"><h2>診断について</h2><p>独自の分類によるエンターテインメント・自己理解用の参考情報です。科学的な心理検査や、相手の気持ち・未来の予測ではありません。結果だけで重要な判断をせず、当事者同士の対話を大切にしてください。</p><h2>利用上のお願い</h2><p>相手の生年月日等は本人の同意を得て入力してください。不正アクセス、過剰な連続送信、サービス妨害、第三者の権利を侵害する利用は禁止します。試験公開中は機能の変更・停止や接続の遅延があり得ます。現在、料金の請求や有料商品の購入受付はありません。</p><h2>運営・問い合わせ</h2><p>星と月 運営<br><a href="mailto:violed423@gmail.com">violed423@gmail.com</a></p></section>'''
+PRIVACY_BODY = '''<section class="hero"><h1>プライバシーポリシー</h1></section><section class="panel"><h2>入力情報の利用</h2><p>生年月日、任意の出生時刻、恋愛スタイルの回答をサーバーへ送信し、その場で診断結果を計算します。処理中はメモリを使用しますが、アプリは入力内容・結果をデータベースやファイルに保存せず、診断履歴を作りません。入力本文や結果をアプリのログへ出力しません。</p><h2>外部サービス・ログ</h2><p>ホスティングには Render を利用します。接続やサービス運用に必要な技術情報は同社の処理対象となります。現在の Hobby ワークスペースのダッシュボードログ保持期間は7日です。これは Render が扱うすべてのデータの削除期限を保証するものではありません。アプリのアクセスログは有効にしていません。分析タグ、広告タグ、決済、会員登録、メール自動送信は組み込んでいません。</p><h2>送信回数の制御</h2><p>過負荷防止のため各処理プロセスで送信回数を一時的に数えます。IPアドレスや回答をこの制御のために記録しません。他の利用者の送信により一時的に利用できない場合は、時間をおいてお試しください。</p><h2>問い合わせ</h2><p>星と月 運営<br><a href="mailto:violed423@gmail.com">violed423@gmail.com</a></p></section>'''
+COMMERCIAL_BODY = '''<section class="panel"><h1>販売について</h1><p>現在は無料の試験公開のみで、有料商品の販売・購入受付・決済は行っていません。販売開始前に販売条件と必要な表示を整備します。</p><a href="/">無料診断に戻る</a></section>'''
+
+class ProcessRateLimit:
+    """Process-local aggregate token bucket, not per-user or distributed protection."""
+    def __init__(self, rate=15 / 60, burst=3, clock=time.monotonic):
+        self.rate, self.burst, self.clock = rate, burst, clock
+        self.tokens, self.updated = float(burst), clock()
+        self.lock = threading.Lock()
+
+    def allow(self):
+        with self.lock:
+            now = self.clock()
+            elapsed = max(0.0, now - self.updated)
+            self.updated = max(now, self.updated)
+            self.tokens = min(self.burst, self.tokens + elapsed * self.rate)
+            if self.tokens < 1:
+                return False
+            self.tokens -= 1
+            return True
+
+DIAGNOSIS_LIMIT = ProcessRateLimit()
 
 
 def _headers(start_response, status='200 OK', content_type='text/html; charset=utf-8'):
@@ -41,7 +63,7 @@ def _headers(start_response, status='200 OK', content_type='text/html; charset=u
 
 def _html(start_response, body, title='星と月｜ふたりの相性診断', status='200 OK'):
     payload = page(body, title).replace(b'<head>', '<head><meta name="description" content="生年月日と恋愛スタイルから、ふたりの関係を見つめるヒントを届けます。">'.encode('utf-8'))
-    nav = '<div style="margin-top:12px"><a href="/source">ソースコード（AGPL）</a> · <a href="/terms">利用規約（草案）</a> · <a href="/privacy">プライバシー（草案）</a> · <a href="/commercial">特商法表示テンプレート</a> · <a href="/premium">詳細レポート</a></div>'.encode('utf-8')
+    nav = '<div style="margin-top:12px"><a href="/source">ソースコード（AGPL）</a> · <a href="/terms">利用規約</a> · <a href="/privacy">プライバシー</a> · <a href="/premium">詳細レポート</a></div>'.encode('utf-8')
     payload = payload.replace(b'</div></main>', b'</div>' + nav + b'</main>')
     _headers(start_response, status)
     return [payload]
@@ -64,7 +86,7 @@ def application(environ, start_response):
         # Add an explicit consent acknowledgement and honeypot field before the submit button.
         body = body.replace('<button type="submit">', '<label class="choice"><input type="checkbox" name="consent" value="yes" required><span>診断の注意事項とプライバシー説明を読み、入力することに同意します。</span></label><button type="submit">')
         body = body.replace('<form method="post">', '<form method="post" action="/diagnose"><div style="position:absolute;left:-10000px" aria-hidden="true"><label>入力しないでください<input name="website" tabindex="-1" autocomplete="off"></label></div>')
-        body = body.replace('<button type="submit">', '<p class="warning">生年月日と回答は診断処理のためサーバーへ送信されます。この試作品は診断履歴をデータベースに保存しませんが、ホスティング事業者の技術ログは別途確認が必要です。相手の情報は本人の同意を得て入力してください。</p><button type="submit">')
+        body = body.replace('<button type="submit">', '<p class="warning">生年月日と回答は診断処理のためサーバーへ送信されます。この試作品は診断履歴をデータベースに保存しませんが、ホスティング事業者は運用上の技術情報を処理します。詳細はプライバシーポリシーをご確認ください。相手の情報は本人の同意を得て入力してください。</p><button type="submit">')
         return _html(start_response, body)
     if method == 'GET' and path == '/source':
         revision = os.environ.get('RENDER_GIT_COMMIT', '')
@@ -79,12 +101,16 @@ def application(environ, start_response):
     if method == 'GET' and path == '/premium':
         return _html(start_response, PREMIUM_BODY, '詳細レポート | 星と月')
     if method == 'GET' and path == '/terms':
-        return _html(start_response, TERMS_BODY, '利用規約（草案） | 星と月')
+        return _html(start_response, TERMS_BODY, '利用規約 | 星と月')
     if method == 'GET' and path == '/privacy':
-        return _html(start_response, PRIVACY_BODY, 'プライバシーポリシー（草案） | 星と月')
+        return _html(start_response, PRIVACY_BODY, 'プライバシーポリシー | 星と月')
     if method == 'GET' and path == '/commercial':
-        return _html(start_response, COMMERCIAL_BODY, '特定商取引法に基づく表記（テンプレート） | 星と月')
+        return _html(start_response, COMMERCIAL_BODY, '販売について | 星と月')
     if method == 'POST' and path == '/diagnose':
+        if not DIAGNOSIS_LIMIT.allow():
+            def limited_response(status, headers):
+                return start_response(status, headers + [('Retry-After', '4')])
+            return _html(limited_response, '<section class="panel"><h1>少し時間をおいてください</h1><p>送信が集中しています。しばらく待ってから再度お試しください。</p></section>', status='429 Too Many Requests')
         try:
             raw_len = int(environ.get('CONTENT_LENGTH') or '0')
             if raw_len < 0 or raw_len > MAX_BODY:

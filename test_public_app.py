@@ -5,6 +5,8 @@ from public_app import application
 
 
 def call(path='/', method='GET', form=None):
+    import public_app
+    public_app.DIAGNOSIS_LIMIT = public_app.ProcessRateLimit()
     data = urlencode(form or {}).encode('utf-8')
     environ = {
         'REQUEST_METHOD': method, 'PATH_INFO': path,
@@ -33,7 +35,7 @@ def main():
     response, body = call('/privacy')
     assert response['status'] == '200 OK' and 'プライバシーポリシー'.encode() in body
     response, body = call('/commercial')
-    assert response['status'] == '200 OK' and '特定商取引法'.encode() in body
+    assert response['status'] == '200 OK' and '販売について'.encode() in body
     form = {'date_a': '2000-01-07', 'date_b': '2001-03-21', 'consent': 'yes'}
     for person in ('a', 'b'):
         for i in range(1, 13):
