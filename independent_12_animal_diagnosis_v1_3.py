@@ -16,6 +16,9 @@ from datetime import date, datetime, time, timedelta, timezone
 from itertools import product
 from zoneinfo import ZoneInfo
 import math
+import json
+from pathlib import Path
+from functools import lru_cache
 
 try:
     import swisseph as swe
@@ -177,7 +180,7 @@ def _find_term_near(start: datetime, target: float) -> datetime:
     return right
 
 
-def _term_events(year: int) -> list[tuple[datetime, float]]:
+def _calculate_term_events(year: int) -> list[tuple[datetime, float]]:
     """All 24 solar terms for a Gregorian year, as JST instants."""
     start = datetime(year, 1, 1, tzinfo=JST)
     end = datetime(year + 1, 1, 1, tzinfo=JST)
@@ -206,6 +209,36 @@ def _term_events(year: int) -> list[tuple[datetime, float]]:
         left, lon_left = right, lon_right
     events.sort()
     return events
+
+
+@lru_cache(maxsize=1)
+def _term_table():
+    """Public astronomical data only: no user input or diagnosis is cached."""
+    raw = json.loads(Path(__file__).with_name('solar_terms_jst.json').read_text())
+    if raw.get('schema') != 1:
+        raise RuntimeError('Unsupported solar term table schema')
+    table = {}
+    for year, rows in raw['years'].items():
+        events = tuple((datetime.fromisoformat(dt).astimezone(JST), float(lon)) for dt, lon in rows)
+        if len(events) != 24 or len({lon for _, lon in events}) != 24:
+            raise RuntimeError('Invalid solar term table')
+        if any(dt.year != int(year) or dt.utcoffset() not in (timedelta(hours=9), timedelta(hours=10)) for dt, _ in events):
+            raise RuntimeError('Invalid solar term dates')
+        if tuple(sorted(events)) != events:
+            raise RuntimeError('Unsorted solar term table')
+        table[int(year)] = events
+    return table
+
+
+@lru_cache(maxsize=32)
+def _fallback_term_events(year):
+    return tuple(_calculate_term_events(year))
+
+
+def _term_events(year: int) -> list[tuple[datetime, float]]:
+    # Return a fresh list, so callers cannot mutate the shared public table.
+    table = _term_table()
+    return list(table[year] if year in table else _fallback_term_events(year))
 
 
 def _pillar_from_cycle(index: int) -> Pillar:
