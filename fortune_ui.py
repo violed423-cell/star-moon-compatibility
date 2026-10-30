@@ -33,4 +33,20 @@ def partial_result(mode, da, db, ta, tb, love=None):
     cards=''.join(f'<div class="box"><div class="ornament" aria-hidden="true">☾ ✧</div><b>{label}</b><h3>{escape(p.character_name)}</h3><p>{escape(p.element)}・{escape(d)}</p><p>{tags(p.keywords)}</p><p>{escape(CHAR_BY_ID[p.character_id].love_advice)}</p></div>' for p,label,d in [(a,'あなた',da),(b,'お相手',db)])
     warnings=''.join(f'<p class="warning">{escape(w)}</p>' for p in (a,b) for w in p.warnings)
     extra=f'<section class="result"><div class="eyebrow">YOUR LOVE STYLE</div><h2>あなたの恋愛スタイル</h2><h3>{escape(love.name)} · {escape(love.code)}</h3><p>{escape(love.tagline)}</p><ul>{ul(love.strengths)}</ul><p>{escape(love.advice)}</p><p class="unknown">お相手の恋愛タイプは未診断です。あなたの回答だけから相手の気持ち・タイプや、ふたりの恋愛スタイル相性は判定しません。</p></section>' if love else ''
-    return BRAND+f'<section class="hero">{ART}<div class="eyebrow">{escape(MODES[mode][0])}</div><h1>ふたりに届いた、<br>星と月のメッセージ。</h1></section>{warnings}<section class="result"><div class="eyebrow">CHARACTER AFFINITY</div><h2>12キャラクターの相性</h2><div class="score">{score}<small> / 100</small></div><p class="score-note">五行の組み合わせによる独自の参考値です。恋愛スタイルの相性・総合点は未算出。「ふたりで12問ずつ」の総合点とは計算方法が異なり、直接比較できません。</p><div class="cols">{cards}</div></section>{extra}<section class="panel"><h2>関係を育てる小さなヒント</h2><p>この結果をきっかけに、「どんな時間が心地いい？」と聞いてみてください。答え合わせより、ふたりの言葉を大切に。</p><a href="/{mode}">同じ方法でもう一度</a> · <a href="/">別の扉を選ぶ</a></section>'
+    return BRAND+f'<section class="hero">{ART}<div class="eyebrow">{escape(MODES[mode][0])}</div><h1>ふたりに届いた、<br>星と月のメッセージ。</h1></section>{warnings}<section class="result"><div class="eyebrow">CHARACTER AFFINITY</div><h2>12キャラクターの相性</h2><div class="score">{score}<small> / 100</small></div><p class="score-note">五行の組み合わせによる独自の参考値です。恋愛スタイルの相性・総合点は未算出。今後提供予定の「ふたりで12問ずつ」の総合点とは計算方法が異なり、直接比較できません。</p><div class="cols">{cards}</div></section>{extra}<section class="panel"><h2>関係を育てる小さなヒント</h2><p>この結果をきっかけに、「どんな時間が心地いい？」と聞いてみてください。答え合わせより、ふたりの言葉を大切に。</p><a href="/">もう一度占う</a> · <a href="/premium">ふたりの詳しい診断（準備中）</a></section>'
+
+
+def free_form():
+    # Begin with the birth-only form; no questionnaire is selected by default.
+    body = form('birth')
+    begin = body.index('<nav class="mode-switch"')
+    end = body.index('</nav>', begin) + len('</nav>')
+    body = body[:begin] + body[end:]
+    body = body.replace('name="mode" value="birth"', 'name="mode" value="free"')
+    body = body.replace('生年月日だけ</div>', 'FREE READING</div>')
+    body = body.replace('ふたりの生年月日から、12キャラクターの相性を。', 'ふたりの生年月日で占えます。あなたの12問は、答えたいときだけ。')
+    optional = '<section class="panel optional-style"><h2>あなたの恋愛スタイルも見る？</h2><label class="choice"><input type="checkbox" name="include_self" value="yes"><span>自分の12問にも答える（任意）</span></label><p class="hint">チェックなしで診断できます。チェックを外すと、入力済みの回答も結果に使いません。</p><div class="optional-questions"><p class="hint">選んだ場合は12問すべてに回答してください。お相手の回答は不要です。</p>' + question_html('a').replace(' required', '') + '</div></section>'
+    body = body.replace('<button type="submit">', optional + '<button type="submit">')
+    return body
+
+STYLE += '.optional-questions{display:none}.optional-style:has(input[name="include_self"]:checked) .optional-questions{display:block}'

@@ -22,7 +22,7 @@ def call(path='/', method='GET', form=None):
 
 
 def main():
-    response, body = call('/both')
+    response, body = call('/')
     assert response['status'] == '200 OK' and 'ふたりの生年月日'.encode() in body
     assert 'サーバーへ送信'.encode() in body and 'consent'.encode() in body
     assert response['headers']['Cache-Control'] == 'no-store'
@@ -36,14 +36,14 @@ def main():
     assert response['status'] == '200 OK' and 'プライバシーポリシー'.encode() in body
     response, body = call('/commercial')
     assert response['status'] == '200 OK' and '販売について'.encode() in body
-    form = {'date_a': '2000-01-07', 'date_b': '2001-03-21', 'consent': 'yes'}
+    form = {'mode':'free', 'include_self':'yes', 'date_a': '2000-01-07', 'date_b': '2001-03-21', 'consent': 'yes'}
     for person in ('a', 'b'):
         for i in range(1, 13):
             form[f'{person}_q{i}'] = 'A' if i % 2 else 'B'
     response, body = call('/diagnose', 'POST', form)
     assert response['status'] == '200 OK', body[:500]
-    assert 'ふたりの診断結果'.encode() in body and b'/ 100' in body
-    response, body = call('/diagnose', 'POST', {'date_a': '2000-01-01', 'date_b': '2001-01-01', 'consent': 'yes'})
+    assert '星と月のメッセージ'.encode() in body and b'/ 100' in body
+    response, body = call('/diagnose', 'POST', {'date_a': '2000-01-01', 'date_b': '2001-01-01', 'consent': 'yes', 'include_self':'yes'})
     assert response['status'] == '400 Bad Request'
     response, body = call('/diagnose', 'POST', {'date_a': '2000-01-01', 'date_b': '2001-01-01'})
     assert response['status'] == '400 Bad Request' and '同意'.encode() in body
@@ -53,7 +53,7 @@ def main():
     assert response['status'] == '400 Bad Request' and '出生時刻'.encode() in body
     response, body = call('/diagnose', 'POST', {'date_a': '2030-01-01', 'date_b': '2001-01-01', 'consent': 'yes'})
     assert response['status'] == '400 Bad Request' and '今日以前'.encode() in body
-    response, body = call('/diagnose', 'POST', {'date_a': '2000-01-01', 'date_b': '2001-01-01', 'consent': 'yes', 'a_q1': 'X'})
+    response, body = call('/diagnose', 'POST', {'date_a': '2000-01-01', 'date_b': '2001-01-01', 'consent': 'yes', 'include_self':'yes', 'a_q1': 'X'})
     assert response['status'] == '400 Bad Request' and '回答が不足'.encode() in body
     assert response['headers']['X-Frame-Options'] == 'DENY'
     assert "object-src 'none'" in response['headers']['Content-Security-Policy']
