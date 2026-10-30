@@ -22,7 +22,7 @@ def call(path='/', method='GET', form=None):
 
 
 def main():
-    response, body = call()
+    response, body = call('/both')
     assert response['status'] == '200 OK' and 'ふたりの生年月日'.encode() in body
     assert 'サーバーへ送信'.encode() in body and 'consent'.encode() in body
     assert response['headers']['Cache-Control'] == 'no-store'

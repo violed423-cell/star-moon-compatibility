@@ -18,6 +18,8 @@ from app_星月自動相性診断_v1_6 import page, form_html, get_answers, axis
 from compatibility_v1_6 import make_profile, calculate_compatibility
 from love_type_16_v1_4 import QUESTIONS, diagnose_answers
 
+import fortune_ui
+
 MAX_BODY = 64 * 1024
 
 PREMIUM_BODY = '''<section class="hero"><h1>あの人との恋愛相性・関係性診断</h1><p>詳細レポートは準備中です。購入・決済はできません。</p></section><section class="panel"><h2>予定している内容</h2><p>8～12ページ程度で、2人の基本性格、恋愛傾向、相性の強み、すれ違いやすいポイント、関係を深めるヒントをお届けする予定です。</p><h2>価格案</h2><p>暫定 1,480円。販売開始前に内容・販売条件を確定します。</p><p class="warning">独自のエンターテインメント・自己理解用の参考情報であり、相手の気持ちや将来を断定するものではありません。</p><a href="/">無料診断に戻る</a></section>'''
@@ -62,8 +64,8 @@ def _headers(start_response, status='200 OK', content_type='text/html; charset=u
 
 
 def _html(start_response, body, title='星と月｜ふたりの相性診断', status='200 OK'):
-    payload = page(body, title).replace(b'<head>', '<head><meta name="description" content="生年月日と恋愛スタイルから、ふたりの関係を見つめるヒントを届けます。">'.encode('utf-8'))
-    nav = '<div style="margin-top:12px"><a href="/source">ソースコード（AGPL）</a> · <a href="/terms">利用規約</a> · <a href="/privacy">プライバシー</a> · <a href="/premium">詳細レポート</a></div>'.encode('utf-8')
+    payload = page(body, title).replace(b'</style>', (fortune_ui.STYLE + '</style>').encode()).replace(b'<head>', '<head><meta name="description" content="生年月日と恋愛スタイルから、ふたりの関係を見つめるヒントを届けます。">'.encode('utf-8'))
+    nav = '<div class="footer-nav"><a href="/source">ソースコード（AGPL）</a> · <a href="/terms">利用規約</a> · <a href="/privacy">プライバシー</a> · <a href="/premium">詳細レポート</a></div>'.encode('utf-8')
     payload = payload.replace(b'</div></main>', b'</div>' + nav + b'</main>')
     _headers(start_response, status)
     return [payload]
@@ -82,7 +84,9 @@ def application(environ, start_response):
     method = environ.get('REQUEST_METHOD', 'GET').upper()
     path = environ.get('PATH_INFO', '/')
     if method == 'GET' and path == '/':
-        body = form_html()
+        return _html(start_response, fortune_ui.landing())
+    if method == 'GET' and path[1:] in fortune_ui.MODES:
+        body = fortune_ui.form(path[1:])
         # Add an explicit consent acknowledgement and honeypot field before the submit button.
         body = body.replace('<button type="submit">', '<label class="choice"><input type="checkbox" name="consent" value="yes" required><span>診断の注意事項とプライバシー説明を読み、入力することに同意します。</span></label><button type="submit">')
         body = body.replace('<form method="post">', '<form method="post" action="/diagnose"><div style="position:absolute;left:-10000px" aria-hidden="true"><label>入力しないでください<input name="website" tabindex="-1" autocomplete="off"></label></div>')
@@ -119,6 +123,10 @@ def application(environ, start_response):
             f = parse_qs(raw, keep_blank_values=True, max_num_fields=100)
             if f.get('website', [''])[0].strip():
                 raise ValueError('フォームを再読み込みしてお試しください。')
+            mode_values = f.get('mode', ['both'])
+            if len(mode_values) != 1 or mode_values[0] not in fortune_ui.MODES:
+                raise ValueError('診断方法を選び直してください。')
+            mode = mode_values[0]
             da = f.get('date_a', [''])[0]; db = f.get('date_b', [''])[0]
             ta = f.get('time_a', [''])[0] or None; tb = f.get('time_b', [''])[0] or None
             if f.get('consent', [''])[0] != 'yes':
@@ -139,11 +147,14 @@ def application(environ, start_response):
                 raise ValueError('生年月日は今日以前の日付を入力してください。')
             if birth_a.year < 1900 or birth_b.year < 1900:
                 raise ValueError('生年月日は1900年以降を入力してください。')
+            if mode in ('birth', 'self'):
+                love = diagnose_answers(_answers(f, 'a')) if mode == 'self' else None
+                return _html(start_response, fortune_ui.partial_result(mode, da, db, ta, tb, love), '星と月の診断結果')
             love_a = diagnose_answers(_answers(f, 'a')); love_b = diagnose_answers(_answers(f, 'b'))
             a = make_profile('あなた', da, love_a.code, birth_time=ta)
             b = make_profile('お相手', db, love_b.code, birth_time=tb)
             r = calculate_compatibility(a, b)
-            return _html(start_response, _result_body(da, db, a, b, love_a, love_b, r), '相性診断結果 | 星と月')
+            return _html(start_response, fortune_ui.BRAND + _result_body(da, db, a, b, love_a, love_b, r) + '<p class="selection-note">総合点＝キャラクター相性35％＋恋愛スタイルの近さ65％。生年月日だけの点数とは直接比較できません。</p><a class="back" href="/">3つの扉へ戻る</a>', '相性診断結果 | 星と月')
         except (ValueError, UnicodeDecodeError) as exc:
             return _html(start_response, f'<section class="panel"><h1>入力を確認してください</h1><p>{escape(str(exc))}</p><a class="back" href="/">戻る</a></section>', '入力エラー | 星と月', '400 Bad Request')
         except Exception:
