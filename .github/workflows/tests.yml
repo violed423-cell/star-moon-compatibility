@@ -24,3 +24,6 @@ jobs:
       - run: python test_preview.py
       - run: python test_calendar_performance.py
       - run: python test_modes.py
+
+      - run: python -m unittest test_fortune_content -v
+      - run: python -m unittest test_ornate_design -v

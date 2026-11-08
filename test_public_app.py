@@ -29,7 +29,7 @@ def main():
     response, body = call('/health')
     assert response['status'] == '200 OK' and b'"status": "ok"' in body and b'1.9-release-candidate' in body
     response, body = call('/premium')
-    assert response['status'] == '200 OK' and '価格案'.encode() in body and '決済'.encode() in body and '1,480円'.encode() in body and '500〜980円'.encode() not in body
+    assert response['status'] == '200 OK' and '鑑定書'.encode() in body and '決済'.encode() in body and '1,480円'.encode() not in body
     response, body = call('/terms')
     assert response['status'] == '200 OK' and '利用規約'.encode() in body
     response, body = call('/privacy')
@@ -42,9 +42,9 @@ def main():
             form[f'{person}_q{i}'] = 'A' if i % 2 else 'B'
     response, body = call('/diagnose', 'POST', form)
     assert response['status'] == '200 OK', body[:500]
-    assert '星と月のメッセージ'.encode() in body and b'/ 100' in body
+    assert '星と月のメッセージ'.encode() in body and b'data-score=' in body and b'<small>%</small>' in body
     response, body = call('/diagnose', 'POST', {'date_a': '2000-01-01', 'date_b': '2001-01-01', 'consent': 'yes', 'include_self':'yes'})
-    assert response['status'] == '400 Bad Request'
+    assert response['status'] == '200 OK'
     response, body = call('/diagnose', 'POST', {'date_a': '2000-01-01', 'date_b': '2001-01-01'})
     assert response['status'] == '400 Bad Request' and '同意'.encode() in body
     response, body = call('/diagnose', 'POST', {'date_a': '1899-12-31', 'date_b': '2001-01-01', 'consent': 'yes'})
@@ -54,7 +54,7 @@ def main():
     response, body = call('/diagnose', 'POST', {'date_a': '2030-01-01', 'date_b': '2001-01-01', 'consent': 'yes'})
     assert response['status'] == '400 Bad Request' and '今日以前'.encode() in body
     response, body = call('/diagnose', 'POST', {'date_a': '2000-01-01', 'date_b': '2001-01-01', 'consent': 'yes', 'include_self':'yes', 'a_q1': 'X'})
-    assert response['status'] == '400 Bad Request' and '回答が不足'.encode() in body
+    assert response['status'] == '400 Bad Request' and '選択肢'.encode() in body
     assert response['headers']['X-Frame-Options'] == 'DENY'
     assert "object-src 'none'" in response['headers']['Content-Security-Policy']
     response, body = call('/unknown')

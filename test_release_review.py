@@ -15,7 +15,7 @@ def main():
     assert r['status']=='200 OK'
     assert '正午時点'.encode() in b, 'Unknown birth time boundary warning must reach user'
     r,b=call('/premium')
-    assert '1,480円'.encode() in b and '8～12ページ'.encode() in b
+    assert '鑑定書'.encode() in b and '1,480円'.encode() not in b and '8～12ページ'.encode() not in b
     class JSTClock(datetime):
         @classmethod
         def now(cls,tz=None):
