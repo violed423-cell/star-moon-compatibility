@@ -221,7 +221,8 @@ class PresentationTests(unittest.TestCase):
         self.assertNotIn(b'name="b_q1"', initial)
         self.assertIn('答えたい質問だけ'.encode(), initial)
         r, html = call('/privacy')
-        self.assertIn(b'violed423@gmail.com', html)
+        self.assertIn('星と月 運営'.encode(), html)
+        self.assertNotIn(b'mailto:', html)
 
 
 if __name__ == '__main__':

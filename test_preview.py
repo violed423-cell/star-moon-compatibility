@@ -1,4 +1,5 @@
 from io import BytesIO
+import re
 from public_app import ProcessRateLimit
 import public_app
 clock = [0.0]
@@ -23,6 +24,14 @@ r,_=call('/diagnose','POST'); assert r['status'].startswith('429') and r['header
 for path in ['/', '/health','/source','/terms','/privacy','/commercial']:
     r,body=call(path); assert r['status']=='200 OK'
     assert '［'.encode() not in body and b'DRAFT' not in body
-r,body=call('/privacy'); assert b'violed423@gmail.com' in body and b'Hobby' in body
+for path in ('/terms', '/privacy'):
+    r, body = call(path)
+    assert r['status'] == '200 OK'
+    assert '星と月 運営'.encode() in body
+    assert b'mailto:' not in body
+    assert not re.search(rb'[A-Za-z0-9_.+%-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', body)
+r, body = call('/privacy')
+assert b'Hobby' in body and b'Render' in body
+assert '入力本文や結果をアプリのログへ出力しません'.encode() in body
 assert not any(k in vars(public_app.DIAGNOSIS_LIMIT) for k in ['ip','answers','requests'])
 print('OK: preview text, process-local rate control and health/source exemptions')

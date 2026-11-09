@@ -62,7 +62,8 @@ class OrnateDesignTests(unittest.TestCase):
             self.assertIn(b'name="consent" value="yes" required', html)
         response, html = call('/privacy')
         self.assertEqual(response['status'], '200 OK')
-        self.assertIn(b'violed423@gmail.com', html)
+        self.assertIn('星と月 運営'.encode(), html)
+        self.assertNotIn(b'mailto:', html)
         self.assertIn(b"form-action 'self'", response['headers']['Content-Security-Policy'].encode())
 
 
